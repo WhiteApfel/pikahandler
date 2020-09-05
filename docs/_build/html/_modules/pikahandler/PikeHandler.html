@@ -1,0 +1,188 @@
+
+<!DOCTYPE html>
+
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pikahandler.PikeHandler &#8212; документация PikaHandler </title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <script src="../../_static/translations.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Исходный код pikahandler.PikeHandler</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">pika</span>
+<span class="kn">import</span> <span class="nn">signal</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+
+<div class="viewcode-block" id="PikaHandler"><a class="viewcode-back" href="../../Class.html#pikahandler.PikaHandler">[документация]</a><span class="k">class</span> <span class="nc">PikaHandler</span><span class="p">:</span>
+	<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Класс, который будет отвечать за расределение запросов к вашим функциям. Важная вещь, не надо его обижать.</span>
+<span class="sd">	Вызывать в начале кода и потом использовать для декорирования.</span>
+
+<span class="sd">	Передавать либо `server, port, host, user (optional), password (optional)`, либо `connection=connection`,</span>
+<span class="sd">	где значение connection - `pika.BlockingConnection(pika.ConnectionParameters(&lt;..&gt;))`</span>
+
+<span class="sd">	**Агрументы и атрибуты**</span>
+
+<span class="sd">	:param server: домен или IP сервера, по умолчанию &#39;localhost&#39;</span>
+<span class="sd">	:type server: ``str``, optional</span>
+<span class="sd">	:param port: порт сервера, по умолчанию &#39;5672&#39;</span>
+<span class="sd">	:type port: ``int``, optional</span>
+<span class="sd">	:param host: адрес очережи, по умолчанию - `/`</span>
+<span class="sd">	:type host: ``str``, optional</span>
+<span class="sd">	:param user: пользователь</span>
+<span class="sd">	:type user: ``str``, optional</span>
+<span class="sd">	:param password: пароль</span>
+<span class="sd">	:type password: ``str``, optional</span>
+<span class="sd">	:param connection: объект соединения</span>
+<span class="sd">	:type connection: ``pika.BlockingConnection``, optional</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">server</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">5672</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+		<span class="k">if</span> <span class="ow">not</span> <span class="n">connection</span><span class="p">:</span>
+			<span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="n">server</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">host</span><span class="p">]</span>
+			<span class="k">if</span> <span class="n">user</span> <span class="ow">and</span> <span class="n">password</span><span class="p">:</span>
+				<span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pika</span><span class="o">.</span><span class="n">PlainCredentials</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">password</span><span class="p">))</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">connection</span> <span class="o">=</span> <span class="n">pika</span><span class="o">.</span><span class="n">BlockingConnection</span><span class="p">(</span><span class="n">pika</span><span class="o">.</span><span class="n">ConnectionParameters</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">))</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">channel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">channel</span><span class="p">()</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">connection</span> <span class="o">=</span> <span class="n">connection</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">channel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">channel</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">handlers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+		<span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_close_connection</span><span class="p">)</span>
+
+	<span class="k">def</span> <span class="nf">_close_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s1">&#39; [*] You pressed Ctrl+C or killed me with -2&#39;</span><span class="p">)</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s1">&#39; [*] Connection closed. By!&#39;</span><span class="p">)</span>
+		<span class="c1"># .... Put your logic here .....</span>
+		<span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PikaHandler.handler"><a class="viewcode-back" href="../../Class.html#pikahandler.PikaHandler.handler">[документация]</a>	<span class="k">def</span> <span class="nf">handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queue</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Декоратор для сохранения функции в список обрабатываемых</span>
+
+<span class="sd">		**Аргументы**</span>
+
+<span class="sd">		:param queue: название очереди</span>
+<span class="sd">		:type queue: ``str``</span>
+<span class="sd">		:param func: лямбда-функция или обычная функция, принимающая в себя один аргумент - класс с ключами ``ch``, ``method``, ``properties``, ``body``.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">handler</span><span class="p">):</span>
+			<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39; [*] Function &quot;</span><span class="si">{</span><span class="n">handler</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s1">&quot; added to handler for &quot;</span><span class="si">{</span><span class="n">queue</span><span class="si">}</span><span class="s1">&quot; queue&#39;</span><span class="p">)</span>
+			<span class="k">if</span> <span class="n">func</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">queue</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="n">queue</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;handler&quot;</span><span class="p">:</span> <span class="n">handler</span><span class="p">,</span> <span class="s2">&quot;filter&quot;</span><span class="p">:</span> <span class="n">func</span><span class="p">})</span>
+				<span class="k">else</span><span class="p">:</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">channel</span><span class="o">.</span><span class="n">queue_declare</span><span class="p">(</span><span class="n">queue</span><span class="o">=</span><span class="n">queue</span><span class="p">)</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="n">queue</span><span class="p">]</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">&quot;handler&quot;</span><span class="p">:</span> <span class="n">handler</span><span class="p">,</span> <span class="s2">&quot;filter&quot;</span><span class="p">:</span> <span class="n">func</span><span class="p">}]</span>
+				<span class="k">return</span> <span class="n">handler</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;filter-function &#39;func&#39; must be function with one argument or lambda&quot;</span><span class="p">)</span>
+		<span class="k">return</span> <span class="n">decorator</span></div>
+
+	<span class="k">def</span> <span class="nf">_parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ch</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">properties</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+		<span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="n">method</span><span class="o">.</span><span class="n">routing_key</span><span class="p">]:</span>
+			<span class="k">if</span> <span class="n">handler</span><span class="p">[</span><span class="s2">&quot;filter&quot;</span><span class="p">]({</span><span class="s2">&quot;ch&quot;</span><span class="p">:</span> <span class="n">ch</span><span class="p">,</span> <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span> <span class="s2">&quot;properties&quot;</span><span class="p">:</span> <span class="n">properties</span><span class="p">,</span> <span class="s2">&quot;body&quot;</span><span class="p">:</span> <span class="n">body</span><span class="p">}):</span>
+				<span class="n">handler</span><span class="p">[</span><span class="s2">&quot;handler&quot;</span><span class="p">](</span><span class="n">ch</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">properties</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PikaHandler.start"><a class="viewcode-back" href="../../Class.html#pikahandler.PikaHandler.start">[документация]</a>	<span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Запускает приём и обработку сообщений из очереди.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">for</span> <span class="n">queue</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">channel</span><span class="o">.</span><span class="n">basic_consume</span><span class="p">(</span><span class="n">queue</span><span class="o">=</span><span class="n">queue</span><span class="p">,</span> <span class="n">on_message_callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parse</span><span class="p">,</span> <span class="n">auto_ack</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s1">&#39; [*] Waiting for messages. To exit press CTRL+C&#39;</span><span class="p">)</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">channel</span><span class="o">.</span><span class="n">start_consuming</span><span class="p">()</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">PikaHandler</a></h1>
+
+
+
+
+
+
+
+
+<h3>Навигация</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../Use.html">Как пользоваться</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../Class.html">Класс обработчика</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Код модуля</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Быстрый поиск</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Искать" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, WhiteApfel.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
